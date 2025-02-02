@@ -1,0 +1,97 @@
+---
+title: "Mixed Model Lab 7"
+output:
+  html_document:
+    df_print: paged
+---
+```{r}
+# install.packages("AmesHousing")
+install.packages("rsq")
+```
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  comment = "",
+  results = "hold",
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  fig.height = 5,
+  fig.align = "center"
+)
+```
+Read in packages
+```{r, message = FALSE, warning=FALSE}
+library(rio)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(ggplot2)
+library(pROC)
+library(AmesHousing)
+library(tidyverse)
+library(rcompanion)
+library(lme4)
+library(rsq)
+library(janitor)
+library(here)
+```
+
+```{r}
+autot <- clean_names(read_csv(here("data", "Automobile_data.csv"),
+  na = c("?", "", "NA", "N/A", "Na"),
+))
+autot <- autot %>%
+  mutate_at(
+    vars(fuel_type, body_style, make),
+    list(factor)
+  )
+```
+
+## Comparing fixed factors versus random effects
+
+1.  Build a model of curb_weight as a function of the factor "make".
+
+```{r}
+mmod1 <- lmer(curb_weight ~ (1 | Maked), data = autot)
+mmod1
+
+```
+
+
+
+2. Create a vector of the coefficients from the model above but start the vector with the coefficient (0) for the base level Alfa-Romeo (i.e., the first element of the vector should be zero, replacing the model intercept). Calculate the sd of this vector.
+
+3. Build a model of curb_weight as a function of the random effect "make" and comment on the findings.
+
+4. Extract the estimate of the effect of each make on curb_weight as a data frame.
+
+5. Compare the sd of coefficients from the fixed effect (question 2) with the sd of the random effect and comment on the difference.
+
+6. Visualise the estimates for both models by using a histogram of Make coefficients.
+
+7. Now try creating a model of curb_weight as a function of the random effect make and the fixed effects length and horsepower (remember to drop NAs).
+
+8. Create a confidence interval for the estimates in the model and comment on them.
+
+9. Compare the impact of fixed with random effects, in particular we need to compare minimum (and predicted) effect associated to 1 sd change in predictor.
+
+  a. Find the sd for length multiply this by the lower estimate from the CI and then divide this by the mean curb_weight and then comment on the obtained decimal (convert to a percentage) - this will give the minimum effect associated with 1 sd change in the predictor
+
+  b. repeat (a.) for horsepower and the random effect. For random effect we just need to use the lower estimate for sig01 divided by mean curb_weight (as sig01 represents the standard deviation of the random effect).
+  
+10. Find the R-squared.
+
+11. Use the R-squared to calculate the adjusted R-squared
+
+Recall adjusted R-squared accounts for including more variables in a model.  This is given by the formula:
+
+$$
+1-(1-R^2)(n-1/n-k)
+$$
+
+where n=number of cases, k=number of parameters in the model.
+
+12. Compare these values to a model does not include make but does include horsepower and length.

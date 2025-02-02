@@ -1,0 +1,431 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# install.packages('pROC', dependencies = TRUE, repos='http://cran.rstudio.com/')
+# install.packages("pROC")
+# install.packages("nnet")
+# install.packages("caret")
+# install.packages("AER")
+# install.packages("ggplot2")
+# install.packages("ggpubr")
+# install.packages("broom")
+install.packages("AICcmodavg")
+
+```
+
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(here)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(magrittr)
+library(janitor)
+library(readxl)
+library(pROC)
+library(nnet)
+library(caret)
+library(AER)
+library(ggpubr)
+library(tidyverse)
+library(broom)
+library(AICcmodavg)
+library(ggpubr)
+library(broom)
+
+```
+
+
+```{r}
+# Load the dataset using a relative path
+data <- read_csv(here("Data", "comic_characters.csv"))
+```
+
+
+```{r}
+# Convert the specified variables to factors
+data <- data %>%
+  mutate(
+    ID = as.factor(ID),
+    ALIGN = as.factor(ALIGN),
+    EYE = as.factor(EYE),
+    HAIR = as.factor(HAIR),
+    ALIVE = as.factor(ALIVE),
+    MONTH_FA = as.factor(MONTH_FA),
+    UNIVERSE = as.factor(UNIVERSE)
+  )
+```
+
+
+```{r}
+# Summarise the data  
+summary(data)
+glimpse(data)
+```
+
+
+```{r}
+# Omit missing values from the data
+data <- na.omit(data)
+```
+
+
+```{r}
+# Filter for years 1956-1999
+data_filtered <- data %>%
+  filter(YEAR_FA >= 1956 & YEAR_FA <= 1999)
+
+```
+
+
+```{r}
+# Exercise 1
+
+comic_linmod <- lm(APPEARANCES ~ YEAR_FA, data = data_filtered)
+comic_linmod2 <- lm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, data = data_filtered)
+
+# Create an ANOVA table for comic_linmod
+
+Anova(comic_linmod)
+
+# Create another ANOVA table for comic_linmod2
+
+Anova(comic_linmod2)
+
+anova(comic_linmod, comic_linmod2)
+
+# The second Anova would be used beca
+
+```
+
+```{r}
+# Exercise 2
+
+# create an Analysis of Variance table for the logistic model _comic_glm that models the universe as a function of YEAR_FA, ALIGN and ID and comment on the findings
+
+linmod5 <- glm(UNIVERSE ~ YEAR_FA + ALIGN + ID, family = binomial, data = autot)
+
+Anova(linmod5)
+
+
+```
+
+```{r}
+# Exercise 3
+
+# Find and comment on the R squared and adjusted R squared for _comic_linmod_ and _comic_linmod2_.
+
+summary(comic_linmod)
+summary(comic_linmod2)
+
+```
+
+```{r}
+# Exercise 4
+
+# a. Build the models comic_glmmod and comic_glmmod2 which are the same models as comic_linmod and comic_linmod2 but use glm() to define the models rather than lm(). Find and comment on the AIC values
+
+comic_glmmod <- glm(APPEARANCES ~ YEAR_FA, data = data_filtered)
+
+comic_glmmod2 <- glm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, data = data_filtered)
+
+Anova(comic_linmod)
+Anova(comic_linmod2)
+
+# b. Find and comment on the AIC values for the two models below.
+
+```
+
+```{r}
+# Exercise 5
+
+# Find and comment on the two AIC values for the two models below:
+
+comic_glmmod3 <- glm(UNIVERSE ~ YEAR_FA, family = "binomial", data = comic_model_data)
+
+comic_glmmod4 <- glm(UNIVERSE ~ YEAR_FA + ALIGN, family = "binomial", data = comic_model_data)
+
+summary(comic_glmmod3)
+summary(comic_glmmod4)
+
+```
+```{r}
+# Exercise 5
+
+# a. Based on APPEARANCES, create a training and testing dataset of the comic_model_data whilst setting seed 123.
+
+set.seed(123)
+training_samples <- data_filtered$APPEARANCES %>%
+ createDataPartition(p = 0.8, list = FALSE)
+train_data <- data_filtered[training_samples, ]
+test_data <- data_filtered[-training_samples, ]
+
+
+# b. Build a Gaussian model using the training data with response Appearances and predictor YEAR_FA.
+
+Anova(lm(Diameter ~ Height, data = trees2))
+
+
+
+# c. Predict onto the testing data. Calculate R2, RMSE, MAE and then comment on these values.
+
+Anova(lm(Diameter ~ Height, data = trees2))
+
+# d. Complete the questions (a) to (c) above for the quasipoisson models of appearances below.
+
+comic_quasipoissonmod1 <- glm(APPEARANCES ~ YEAR_FA, data = data_filtered, family = "quasipoisson")
+comic_quasipoissonmod2 <- glm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, data = data_filtered, family = "quasipoisson")
+
+summary(comic_quasipoissonmod1)
+```
+
+
+```{r}
+# Exercise 6
+
+# a. Based on the model comic_glm in Exercise 2, create a training and testing dataset whilst setting seed 123. Build a model with the training data. Predict using the training data and the testing data.
+
+set.seed(123)
+training_samples2 <- data_filtered$APPEARANCES %>%
+ createDataPartition(p = 0.8, list = FALSE)
+train_data <- data_filtered[training_samples, ]
+test_data <- data_filtered[-training_samples, ]
+
+# Linmod5
+
+# b. Plot the ROC curve comparing the testing and training data and comment on this.
+
+train_model3 <- glm(UNIVERSE ~ YEAR_FA + ALIGN + ID, data = data_filtered, family = "binomial")
+
+predtrain3 <- predict(train_model3, type = "response")
+predtest3 <- predict(train_model3, newdata = data_filtered, type = "response")
+
+
+roctrain <- roc(response = data_filtered$UNIVERSE, predictor = predtrain3, plot = TRUE, main = "ROC Curve for prediction of Marvel Universe", auc = TRUE)
+roc(response = data_filtered$UNIVERSE, predictor = predtest3, plot = TRUE, auc = TRUE, add = TRUE, col = 2)
+legend(0, 0.4, legend = c("training", "testing"), fill = 1:2)
+
+# c. Complete question (a) for _multi_comic_ model below. Then calculate the confusion matrices and sums of sensitivities for training and testing data.
+
+multi_comic <- multinom(ALIGN ~ ALIVE + YEAR_FA, data = comic_model_data)
+
+set.seed(123)
+training_samples4 <- c(comic_model_data$ALIGN) %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train_data4 <- comic_model_data[training_samples4, ]
+test_data4 <- comic_model_data[-training_samples4, ]
+
+train_model4 <- multinom(ALIGN ~ ALIVE + YEAR_FA, data = train_data4)
+
+predtrain4 <- predict(train_model4, type = "class")
+predtest4 <- predict(train_model4, newdata = test_data4, type = "class")
+
+T1 <- table(predtrain4, train_data4$ALIGN)
+T2 <- table(predtest4, test_data4$ALIGN)
+T1
+T2
+
+sstrain <- T1[1, 1] / (T1[1, 1] + T1[2, 1] + T1[3, 1]) +
+  T1[2, 2] / (T1[1, 2] + T1[2, 2] + T1[3, 2]) +
+  T1[3, 3] / (T1[1, 3] + T1[2, 3] + T1[3, 3])
+sstest <- T2[1, 1] / (T2[1, 1] + T2[2, 1] + T2[3, 1]) +
+  T2[2, 2] / (T2[1, 2] + T2[2, 2] + T2[3, 2]) +
+  T2[3, 3] / (T2[1, 3] + T2[2, 3] + T2[3, 3])
+
+sstrain
+sstest
+
+```
+
+
+
+
+
+
+# c. Complete question (a) for _multi_comic_ model below. Then calculate the confusion matrices and sums of sensitivities for training and testing data.
+```
+
+
+```{r}
+train_model3 <- glm(UNIVERSE ~ YEAR_FA + ALIGN + ID, data = train_data3, family = "binomial")
+```
+
+
+
+
+```{r}
+# Create a linear regression model (DV -> IV)
+model <- lm(APPEARANCES ~ YEAR_FA, data = data_filtered)
+
+# View a summary of the model
+summary(model)
+
+```
+
+
+```{r}
+# Drop unused levels for ALIGN and ALIVE
+data_filtered <- data_filtered %>%
+  mutate(
+    ALIGN = droplevels(ALIGN),
+    ALIVE = droplevels(ALIVE)
+  )
+
+# Create the updated linear regression model
+model_updated <- lm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, data = data_filtered)
+
+# View a summary of the new model
+summary(model_updated)
+
+```
+
+```{r}
+# Summarize the data
+
+summary(data_filtered)
+glimpse(data_filtered)
+```
+
+
+
+1.  Now build, interpret and evaluate a logistic regression model using any combination of variables other than page_id and NAME to try to predict which UNIVERSE they are from.  Use ROC curves to choose the best model you can find.
+
+
+```{r}
+# Logistic regression predicting UNIVERSE using selected variables
+logistic_model <- glm(UNIVERSE ~ ALIGN + ALIVE + YEAR_FA + HAIR + EYE, 
+                      data = data_filtered, 
+                      family = binomial)
+
+# View the model summary
+summary(logistic_model)
+
+```
+
+```{r}
+# Calculate the confidence intervals for the coefficients in linmod4 and linmod5 and interpret these in terms of the dataset
+
+linmod4 <- lm(UNIVERSE~  + ALIGN + ALIVE + YEAR_FA + HAIR + EYE, data = data_filtered)
+
+linmod5 <- glm(as.factor(UNIVERSE) ~ ALIGN + ALIVE + HAIR + EYE, family = "binomial", data = data_filtered)
+```
+
+
+```{r}
+# Predict probabilities for the logistic regression model
+predicted_probs <- predict(logistic_model, type = "response")
+pred_data <- tibble(ALIGN = "Good Characters", ALIVE = "Living Characters", YEAR_FA = "1962", )
+predict(logistic_model, data = pred_data)
+
+# Generate an ROC curve
+roc_curve <- roc(data_filtered$UNIVERSE, predicted_probs)
+
+# Plot the ROC curve
+plot(roc_curve, main = "ROC Curve for Logistic Regression", col = "blue")
+print(paste("AUC:", auc(roc_curve)))
+
+```
+
+
+2.  Build, evaluate and interpret a multinomial model using any combination of variables other than page_id and NAME to predict ALIGN for characters.  Use confusion matrices to compare the quality of models.
+
+To answer these questions please follow the steps provided in the file below (lab3_questions_breakdown.Rmd).
+
+```{r}
+# Multinomial logistic regression model
+multinom_model <- multinom(ALIGN ~ YEAR_FA + ALIVE + HAIR + EYE, data = data_filtered)
+
+# View the model summary
+summary(multinom_model)
+
+```
+
+
+```{r}
+# Predict ALIGN categories
+predictions <- predict(multinom_model, data_filtered)
+
+# Create a confusion matrix
+confusion_matrix <- table(Predicted = predictions, Actual = data_filtered$ALIGN)
+print(confusion_matrix)
+
+```
+
+```{r}
+# Calculate overall accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+print(paste("Accuracy:", round(accuracy, 2)))
+
+# Generate detailed performance metrics
+conf_matrix <- confusionMatrix(predictions, data_filtered$ALIGN)
+print(conf_matrix)
+
+```
+
+
+Fit and evaluate the dispersion assumption of a Poisson model for number of appearances of a character as predicted by YEAR_FA, ALIGN and ALIVE. Remember to drop any unused level of the variables ALIGN and ALIVE before modeling.
+
+
+```{r}
+# Fit Poisson model
+poisson_model <- glm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, 
+                     family = poisson(link = "log"), 
+                     data = data_filtered)
+
+# View model summary
+summary(poisson_model)
+
+```
+
+
+```{r}
+# Calculate the dispersion statistic
+dispersion_stat <- sum(residuals(poisson_model, type = "pearson")^2) / df.residual(poisson_model)
+print(paste("Dispersion Statistic:", round(dispersion_stat, 2)))
+
+dispersiontest(poisson_model)
+
+
+
+```
+
+```{r}
+# Fit a quasi-Poisson model
+quasi_poisson_model <- glm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, 
+                           family = quasipoisson(link = "log"), 
+                           data = data_filtered)
+
+# View model summary
+summary(quasi_poisson_model)
+
+```
+
+```{r}
+# Load the MASS package
+library(MASS)
+
+# Fit a negative binomial model
+neg_binomial_model <- glm.nb(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, 
+                             data = data_filtered)
+
+# View model summary
+summary(neg_binomial_model)
+
+```
+
+```{r}
+# Compare AIC values
+aic_poisson <- AIC(poisson_model)
+aic_quasi <- AIC(quasi_poisson_model) # Quasi-Poisson does not return a valid AIC
+aic_neg_bin <- AIC(neg_binomial_model)
+
+print(paste("Poisson AIC:", aic_poisson))
+print(paste("Negative Binomial AIC:", aic_neg_bin))
+
+```
+

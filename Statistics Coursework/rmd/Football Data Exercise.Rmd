@@ -1,0 +1,105 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Load necessary libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(here)
+```
+
+```{r}
+# Import the dataset
+
+football_data <- read_csv(here("Data", "england-premier-league-players-2018-to-2019-stats.csv"))
+                          
+```
+
+
+```{r}
+# Check for missing values
+sum(is.na(football_data))
+
+# Inspect columns with NAs (if any)
+colSums(is.na(football_data))
+
+```
+
+
+```{r}
+# Convert Position to a factor
+football_data$Position <- as.factor(football_data$Position)
+
+# Check the levels of the Position variable
+levels(football_data$Position)
+
+```
+
+```{r}
+summary(football_data)
+glimpse(football_data)
+```
+
+
+```{r}
+library(ggplot2)
+
+# Scatter plot with Position as color
+ggplot(football_data, aes(x = minutes_played_overall, y = goals_overall, color = position)) +
+  geom_point() +
+  labs(title = "Goals Scored vs Minutes Played by Position", 
+       x = "minutes_played_overall", 
+       y = "goals_overall") +
+  theme_minimal()
+
+```
+
+
+```{r}
+# Filter out positions where players scored zero goals
+football_data <- football_data[football_data$goals_overall > 0, ]
+
+# Check the updated dataset
+table(football_data$position)
+
+```
+
+
+```{r}
+# Build a linear model without interaction
+model1 <- lm(goals_overall ~ minutes_played_overall + position, data = football_data)
+
+# Summary of the model
+summary(model1)
+
+```
+
+
+```{r}
+# Build a linear model with interaction
+model2 <- lm(goals_overall ~ minutes_played_overall * position, data = football_data)
+
+# Summary of the model
+summary(model2)
+
+
+```
+
+
+```{r}
+# Check residual plots for model 1
+par(mfrow = c(2, 2))
+plot(model1)
+
+# Check residual plots for model 2
+plot(model2)
+
+```
+
+```{r}
+
+```
+

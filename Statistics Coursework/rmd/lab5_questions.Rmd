@@ -1,0 +1,147 @@
+---
+title: "Lab 5" 
+output:
+  html_document:
+
+    highlight: textmate
+    toc_depth: 2
+---
+```{r}
+# install.packages("investr")
+# install.packages("rio")
+# install.packages("rcompanion")
+# install.packages("ggcorrplot")
+# install.packages("corrr")
+# install.packages("effects")
+install.packages("magrittr")
+```
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  comment = "",
+  results = "hold",
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  fig.height = 5,
+  fig.align = "center"
+)
+```
+
+
+### Set up from previous labs
+```{r, message = FALSE,comment=FALSE, warning=FALSE}
+library("MASS")
+library("sandwich")
+library("investr")
+library("rio")
+library("pROC")
+library("nnet")
+library("tidyverse")
+library("magrittr")
+library("here")
+library("janitor")
+library("readxl")
+library("rcompanion")
+library("ggcorrplot")
+library("corrr")
+library("effects")
+```
+
+
+```{r}
+# 
+trees2 <- trees %>%
+  mutate(Diameter = Girth) %>%
+  dplyr::select(Height, Diameter, Volume)
+
+autot <- clean_names(read_csv(here("data", "Automobile_data.csv"),
+  na = c("?", "", "NA", "N/A", "Na"),
+))
+
+comic_data <- read_csv(here("data", "comic_characters.csv"))
+comic_data <- comic_data %>%
+  mutate_at(
+    vars(ID, ALIGN, EYE, HAIR, ALIVE, MONTH_FA, UNIVERSE),
+    list(factor)
+  )
+clean_comic_data <- comic_data %>%
+  drop_na()
+comic_model_data <- clean_comic_data %>%
+  filter(YEAR_FA >= 1956 & YEAR_FA <= 1999)
+comic_model_data$ALIGN <- droplevels(comic_model_data$ALIGN)
+```
+
+### Question 1
+**Exercise (a):** Find the confidence intervals for the coefficients in linmod4 and linmod5 (given below) and interpret these in terms of the dataset.
+
+```{r}
+linmod4 <- lm(highway_mpg ~ width + curb_weight + fuel_type + body_style, data = autot)
+
+linmod5 <- glm(as.factor(aspiration) ~ drive_wheels + engine_size + horsepower, family = "binomial", data = autot)
+
+confint(linmod4)
+summary(linmod4)
+confint(linmod5)
+summary(linmod5)
+```
+
+
+### Question 2
+**Exercise (b)** calculate the robust confidence intervals for linmod3 (below) and interpret in terms of the dataset.
+
+```{r}
+
+trees2 <- trees2 %>%
+  mutate(logheight = log(Height)) %>%
+  mutate(logvol = log(Volume)) %>%
+  mutate(logdiam = log(Diameter))
+linmod3 <- lm(logvol ~ logheight + logdiam, data = trees2)
+
+# Calculate the robust confidence intervals for linmod3, and interpret in terms of the dataset
+
+std_err <- sqrt(diag(vcovHC(linmod3, type = "HC0")))
+r_est <- cbind(
+ Estimate = coef(linmod3), "Robust SE" = std_err,
+ "Pr(>|z|)" = 2 * pnorm(abs(coef(linmod3) / std_err), lower.tail = FALSE),
+ LL = coef(linmod3) - 1.96 * std_err,
+ UL = coef(linmod3) + 1.96 * std_err
+)
+r_est
+
+summary(trees2)
+summary(linmod3)
+```
+
+
+### Question 3
+For comic_linmod3 below, estimate the confidence interval for the probability that the UNIVERSE is MARVEL. 
+
+```{r}
+comic_linmod3 <- glm(UNIVERSE ~ YEAR_FA, family = "binomial", data = comic_model_data)
+
+confint(comic_linmod3)
+
+summary(comic_linmod3)
+```
+
+### Question 4
+For multi_comic model below, use the effects function to visualise confidence intervals for Align based on year_fa. How the range of predicted probabilities for each class changes as year_fa changes.
+
+```{r}
+multi_comic <- multinom(ALIGN ~ ALIVE + YEAR_FA, data = comic_model_data)
+
+summary(multi_comic)
+```
+
+### Question 5
+Calculate the confidence interval for the mean number of appearances of good characters that are alive and introduced in 1990 using Poisson and QuasiPoission models below. Compare the two intervals.
+```{r}
+comic_poissonmod <- glm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, data = comic_model_data, family = "poisson")
+comic_quassipoissonmod <- glm(APPEARANCES ~ YEAR_FA + ALIGN + ALIVE, data = comic_model_data, family = "quasipoisson")
+
+summary(comic_poissonmod)
+summary(comic_quassipoissonmod)
+```

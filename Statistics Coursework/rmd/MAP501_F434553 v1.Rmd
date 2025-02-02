@@ -1,0 +1,530 @@
+---
+title: "MAP501_F434553"
+author: "jack Bagnall"
+date: "2024-11-22"
+output: html_document
+---
+
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Configure global chunk options
+```
+
+```{r}
+# Install packages
+
+# install.packages("Lahman")
+# install.packages("viridis")
+# install.packages("lindia")
+# install.packages("corrplot")
+# install.packages("knitr")
+```
+
+
+```{r}
+# Load packages
+
+library("tidyverse")
+library("magrittr")
+library("here")
+library("janitor")
+library("gridExtra")
+library("readxl")
+library("Lahman")
+library("viridis")
+library("lindia")
+library("lme4")
+library("caret")
+library("pROC")
+library("car")
+library("corrplot")
+library("knitr")
+```
+
+```{r}
+# a. Starting with the dataset Managers, create a new dataset called 'df_managers' that contains a variable win_pct, equal to the proportion of games managed resulting in a win, and the variables playerID, teamID, yearID, igID, plyrMgr.
+
+df_managers <- Managers %>% mutate(win_pct = (W / G) * 100)
+
+# df_managers overview
+
+# summary(df_managers)
+glimpse(df_managers)
+ 
+
+```
+
+```{r}
+# Overview of Teams
+
+glimpse(Teams)
+```
+
+
+```{r}
+
+# b, i. create a new dataset called awards_man by extracting these four variables from Teams: 'yearID', 'teamID', 'DivWin', and 'CS'
+
+df_teams <- Teams %>% select(yearID, teamID, DivWin, CS)
+
+# Overview of df_teams
+
+glimpse(df_teams)
+summary(df_teams)
+
+```
+
+
+```{r}
+# b, ii. Add together all of the variables from df_teams to the df_managers dataset
+
+man_teams <- df_managers %>% left_join(df_teams, by = "yearID")
+
+man_teams <- man_teams %>% 
+  select(-teamID.y, -lgID)
+
+man_teams <- man_teams %>%
+  rename(
+    teamID = teamID.x
+  )
+
+# man_teams <- man_teams %>% rename(teamID = teamID.y)
+
+# Overview of man_teams
+
+glimpse(man_teams)
+
+
+
+```
+
+```{r}
+# b, iii. 
+
+# Add all columns from the man_teams dataset to the df_managers dataset to the AwardsShareManagers dataset to create a new dataset to create the dataset awards_man
+
+awards_man <- AwardsShareManagers %>% left_join(man_teams, by =  "yearID") 
+
+glimpse(awards_man)
+
+```
+
+```{r}
+# b, iv.
+
+# Create new variable sqr_point_pct given by sqrt(pointsWon / pointsmax) in the awards_man dataset
+
+awards_man <- awards_man %>% mutate(sqr_point_pct = pointsWon / pointsMax)
+  
+## Overview 
+
+glimpse(awards_man)
+summary(awards_man)
+
+```
+
+```{r}
+# b, v.
+
+# Delete the incomplete cases in the awards_man dataset and ensure all variables are treated correctly. Then drop the unused levels of the teamID variable in the awards_man dataset
+
+# Identify incomplete cases 
+
+incomplete_cases_awards_man <- !complete.cases(awards_man)
+print(incomplete_cases_awards_man)
+
+is.na(awards_man)
+
+
+# No missing cases 
+
+# Identify unused levels in the data (145 total levels)
+
+table(awards_man$teamID)
+
+levels(awards_man$teamID)
+
+# sum(table(awards_man$teamID)) - Equals 518,188 observable variables.
+
+# Count unused levels in teamID - Result: 114.
+
+sum(table(awards_man$teamID) == 0)
+
+# Drop the unused levels of teamID
+
+awards_man$teamID <- droplevels(awards_man$teamID)
+
+# Check if unused levels have been dropped - COMPLETE
+
+sum(table(awards_man$teamID) == 0)
+
+```
+
+
+```{r}
+# c. Use the dataset awards_man to fit a Gaussian model, spp_mod, of sqr_point_pct as a function of win_pct, DivWin, and CS. Report and interpret the results. Write out the form of the fitted model (rounded to 2 significant figures). [10 points]
+
+# Fit a gaussian model, spp_mod or sqr_point_pct as a function of win_pct, DivWin, and CS.
+
+spp_mod <- lm(sqr_point_pct ~ win_pct + DivWin + CS, data = awards_man)
+
+summary(spp_mod)
+
+```
+
+# Report and interpret the results
+
+A linear regression analysis was fitted to investigate the relationship between sqr_point_pct (the square root of (pointsWon / PointsMax) and three predictors: win_pct, DivWinY, and CS. The fitted model is as follows:
+
+sqr_point_pct=0.27−0.000062⋅win_pct−0.00097⋅DivWinY+0.00039⋅CS
+
+A linear regression model was witted to investigate the relationship between the square root of the proportion of points won by a team, divided by the total points available to win. (sqr_pointpct = PointsWon/PointsMax).  The predictors included in the model were: 
+
+* Winning percentage (win_pct): The proportion of games won by a team during the season.
+
+* Division Win (DivWinY): A binary variable indicating whether the team won its division (1 = Yes, 0 = No).
+
+* Championship Series (CS): A binary variable indicating whether the team participated in the championship series (1 = Yes, 0 = No).
+
+The regression equation was specified as: 
+
+**sqr_point_pct=β0+β1⋅win_pct+β2⋅DivWinY+β3⋅CS+ϵ\text{sqr\_point\_pct} = \beta_0 + \beta_1 \cdot \text{win\_pct} + \beta_2 \cdot \text{DivWinY} + \beta_3 \cdot \text{CS} + \epsilon 
+where β0\beta_0 is the intercept, β1\beta_1, β2\beta_2, and β3\beta_3 are the coefficients for the predictors, and ϵ\epsilon is the error term.**
+
+Results: 
+
+
+Regression Coefficients:
+
+```{r}
+# Create a table of the Regression Coefficient values
+
+# Create a data frame of residual values
+
+coefficients <- data.frame(
+  Predictor = c("(Intercept)", "win_pct", "DivWinY", "CS"),
+  Estimate = c(2.720e-01, -6.215e-05, -9.698e-04, 3.925e-04),
+  `Std. Error` = c(1.900e-03, 3.084e-05, 1.032e-03, 2.464e-05),
+  `t value` = c(143.175, -2.015, -0.940, 15.930),
+  `Pr(>|t|)` = c("<2e-16", "0.0439", "0.3474", "<2e-16"),
+  Significance = c("***", "*", "", "***")
+)
+
+
+# Print the Regression Coefficients data frame as a table using the knitr function
+
+kable(coefficients, format = "html", caption = "Regression Coefficients", align = "c")
+
+```
+
+Residuals:
+
+```{r}
+# Create a table of Residual values for the Linear Regression model
+
+# Create a data frame of residual values
+
+residuals <- data.frame(
+  Statistic = c("Min", "1Q", "Median", "3Q", "Max"),
+  Value = c(-0.3080, -0.2505, -0.1104, 0.2165, 0.7133)
+)
+
+# Print the Residuals data frame as a table using the knitr function
+
+kable(residuals, format = "html", caption = "Residuals", align = "c")
+
+```
+
+
+Interpretation: 
+
+* Intercept: The baseline proportion of the points won is approximately 0.27 when all predictors are zero. This represents teams with no wins, no division title, and no Championshipo Series participation.
+
+* win_pct: A statistically significant (p = 0.0439) but small negative relationship exists between winning percentage and the proportion of points won, suggesting a minor decrease in sqr_point_pct as win_pct increases.
+
+* DivWinY: Division wins do not significantly predict the proportion of points won (p = 0.3474).
+
+* CS: Championship Series participation is a strong, significant predictor  (p < 2e-16), indicating a positive association between CS and sqr_point_pct.
+
+Residuals:
+
+
+
+# Model fit #
+
+* Residual Standard Error: 0.2849
+
+* Multiple R-squared: 0.00053
+
+* Adjusted R-squared: 0.00052
+
+* F-statistic: 87.36 (p < 2.2e-16)
+
+```{r}
+# Create a table of the Model Summary 
+
+# Create a data frame of the Model Summary
+
+model_summary <- data.frame(
+  Statistic = c("Residual standard error", "Degrees of freedom", "Multiple R-squared", "Adjusted R-squared", "F-statistic", "p-value"),
+  Value = c("0.2849", "494936", "0.0005292", "0.0005232", "87.36", "< 2.2e-16")
+)
+
+# Print the Model Summary data frame as a table using the knitr function
+
+kable(model_summary, format = "html", caption = "Model Summary", align = "c")
+```
+
+Interpretation:
+
+The model explains only 0.053% of the variance in sqr_point_pct, suggesting that the included predictors do not account for much variability in the proportion of points won. While the F-statistic indicates the model is statistically significant overall, its predictive power is limited.
+
+
+Conclusion
+
+This analysis demonstrates that Championship Series participation (CS) is the strongest predictor of the proportion of points won (sqr_point_pct), with a significant positive effect. Winning percentage (win_pct) has a small but significant negative effect, while division wins (DivWinY) are not a meaningful predictor. The low R-squared value indicates that additional predictors or alternative modeling approaches may be required to better explain the variation of points won.
+
+
+# 1.d State and evaluate the assumptions of the Fitted Model
+
+Assumptions of the Fitted Model:
+
+1. Linearity:
+
+The relationship between each predictor and response variable (sqr_points_pct) is assumed to be linear. 
+
+2. Homoscedasticity:  
+
+The variance of the residuals is assumed to be constant across all levels of the predictors.
+
+3. Independence of Errors:
+
+The residuals (differences between observed and predicted values) are assumed to be independent. This means there should be no systematic pattern in the errors.
+
+3. Homoscedasticity: 
+
+The variance of the residuals is assumed to be constant across all levels of the predictors.
+
+4. Normality of Errors: 
+
+The residuals are assumed to follow a normal distribution, especially important for hypothesis testing on coefficients.
+
+5. No Multicollinearity:
+
+Predictors are assumed to not be highly correlated with each other, as multicollinearity can distort coefficient estimates and inflate standard errors.
+
+
+Evaluation of assumptions
+
+1. linearity:
+
+Diagnostic: Residual vs. Fitted plot. If the residuals snow no clear pattern, the linearity assumption is likely satisfied.
+
+Evaluation: If the residual plot is random, this assumption holds; otherwise, a transformation or a different model may be needed.
+
+```{r}
+# Create a Residuals vs. Fitted Plot to check if the relationship between predictors and the response variable is linear
+
+ggplot(data = data.frame(fitted = fitted(spp_mod), 
+                         residuals = residuals(spp_mod)), 
+       aes(x = fitted, y = residuals)) +
+  geom_point(alpha = 0.4, color = "blue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", lwd = 0.8) +
+  labs(title = "Residuals vs. Fitted: Checking Linearity", 
+       x = "Fitted Values", 
+       y = "Residuals") +
+  theme_minimal()
+```
+
+Interpretation: The residual plot shows horizontal streaks spanning most of the vizualition, indicating that the residuals do not show a clear linear trend. The streak suggest that the linearity assumption is not fully satisfied but is not drastically violated. 
+
+This pattern suggests that while a linear relationship is present, there may be minor model misspecifications or interactions between predictors that are not captured.
+
+
+Potential solutions include adding interaction terms or transformation for predictors. Additionally, check for potential omitted variables that could explain some of the variation.
+
+
+2. Homoscedasticity:
+
+Diagnostic: Scale-Location plot or Breusch-Pagan test. A horizontal band in the Scale-Location plot suggests constant variance.
+
+Evaluation: If residuals spread out unevenly, this assumption is violated. Remedies include weighted regression or transformations.
+
+```{r}
+# Create a Scale-Location Plot to check if residuals have constant variance (homoscedasticity) across fitted values
+
+ggplot(data = data.frame(fitted = fitted(spp_mod), 
+                         sqrt_abs_resid = sqrt(abs(residuals(spp_mod)))), 
+       aes(x = fitted, y = sqrt_abs_resid)) +
+  geom_point(alpha = 0.4, color = "blue") +
+  geom_smooth(method = "loess", color = "red", se = FALSE) +
+  labs(title = "Scale-Location Plot: Checking Homoscedasticity", 
+       x = "Fitted Values", 
+       y = "Sqrt(|Residuals|)") +
+  theme_minimal()
+
+```
+
+Interpretation: The lack of clear patterns in the scale-location plot suggests missing the predictors or a need for model re-specification. The horizontal streaks are slightly less uniform compared to the linearity plot and include some curved lines a tthe bottom, covering most of the visualization.
+
+These factors suggest minor heteroscedasticity may be present, but the overall structure suggests the model does not have sever issues with unequal variance.
+
+A potential solution could be to test for heteroscedasticity using the Breusch-Pagan test.
+
+
+
+
+
+3. Independence of Errors:
+
+Diagnostic: Durbin-Watson test or visual inspection of residuals over time.
+
+Evaluation: Independence is violated if there are systematic patterns (e.g., trends or clustering).
+
+```{r}
+# Create a Residuals vs. Observation Order Plot to check if residuals are independent, especially relevant for time-series or sequential data. Use the appropriate visual controls.
+
+ggplot(data = data.frame(observation = seq_along(residuals(spp_mod)), 
+                         residuals = residuals(spp_mod)), 
+       aes(x = observation, y = residuals)) +
+  geom_point(alpha = 0.4, color = "blue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", lwd = 0.8) +
+  labs(title = "Residuals vs. Observation Order: Checking Independence", 
+       x = "Observation Index", 
+       y = "Residuals") +
+  theme_minimal() 
+
+```
+
+Interpretation: The residuals are scattered along the horizontal plane but are more concentrated toward the lower range of the observation index (x-axis). The scatter remains dense across the horizontal plane, consistent with the residual vs. fitted plot.
+
+The distribution suggests possible autocorrelation or clustering in certain segments of the data.
+
+A potential solution would be to conduct the Durbin-Watson test to check for autocorrelation. 
+
+
+
+
+
+4. Normality of Errors:
+
+Diagnostic: Q-Q plot of residuals or Shapiro-Wilk test. Points on the Q-Q plot should lie on a straight line if residuals are normally distributed.
+
+Evaluation: Deviations from normality suggest potential issues with hypothesis testing but may not affect predictions if sample size is large (Central Limit Theorem).
+
+```{r}
+# Create a Q-Q Plot of Residuals to check if residuals follow a normal distribution
+
+ggplot(data = data.frame(sample = qqnorm(residuals(spp_mod), plot = FALSE)$x, 
+                         theoretical = qqnorm(residuals(spp_mod), plot = FALSE)$y), 
+       aes(sample, theoretical)) +
+  geom_point(alpha = 0.6, color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", lwd = 0.8) +
+  labs(title = "Q-Q Plot: Checking Normality", 
+       x = "Theoretical Quantiles", 
+       y = "Sample Quantiles") +
+  theme_minimal()
+
+# Create a Histogram of Residuals to visually inspect the distribution of residuals
+
+ggplot(data = data.frame(residuals = residuals(spp_mod)), 
+       aes(x = residuals)) +
+  geom_histogram(binwidth = 0.05, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Residuals: Checking Normality", 
+       x = "Residuals", 
+       y = "Frequency") +
+  theme_minimal()
+```
+
+Interpretation: The Q-Q plot shows significant deviation from the diagonal line. The plotted points form an "S" shape, with a long section following the line of best fit slightly to the right. The histogram of residuals spans from -0.3080 to 0.7133, with a frequency peak at the second bar of approximately 120,000 couints, gradually declining thereafter.
+
+These distributions of non-normal residuals indicate the presence of outliers or skewed data.
+
+Potential solutions include: applying transformations to the dependent variable, such as a log or Box-Cox transformation; using robust regression methods to minimize the influence of outliers; and considering non-parametric regression methods if transformations do not resolve the issue.
+
+
+
+
+
+5. No Multicollinearity:
+
+Diagnostic: Variance Inflation Factor (VIF). VIF values above 10 indicate high multicollinearity.
+
+Evaluation: If multicollinearity exists, consider removing or combining correlated predictors.
+
+```{r}
+# Create a Correlation Matrix Heatmap to visualize correlations between predictors, identifying potential multicollinearity
+
+corrplot(cor(model.matrix(~ win_pct + DivWinY + CS)), 
+         method = "color", 
+         tl.col = "black", 
+         tl.cex = 0.8)
+
+# Create a Variance Inflation Factor (VIF) for a numeric assessment
+
+vif_values <- vif(spp_mod)
+vif_values
+```
+Interpretation: Low VIF values (<5) suggest no multicollinearity issues. Multicollinearity is not a concern here, but regularization methods such as Lasso regression could be used if future predictors are added and multicollinearity increases.
+
+
+Final Evaluation of the Fitted Model:
+
+Strengths:
+
+1. Linearity: The linearity assumption is mostly satisfied. Residual plots reveal horizontal streaks, suggesting the model captures a significant portion of the linear relationships. While minor deviations exist, they are unlikely to severely impact the model'svalidity. Adjustments, such as adding interaction terms or transformations, could further enhance model performance.
+
+2. Homoscedasticity: Although minor heteroscedasticity is present, the overall scale-location plot does not display severe violations of the assumption. The use of robust standard errors or additional predictors could address this issue effectively.
+
+3. Independence of errors: While some clustering of residuals was observed in the residuals vs. observation index plot, the lack of severe patterns suggests that independence of errors is not a critical issue. Any detected temporal autocorrelation could be mitigated by including lagged terms or using autoregressive models.
+
+4. Multicollinearity: Variance Inflation Factor (VIF) values confirm no multicollinearity among predictors, making the model coefficients stable and interpretable.
+
+5. Normality: While residuals deviate significantly from normality (as observed in the Q-Q plot), this issue can be addressed by applying robust regression methods, variable transformations (e.g., log or Box-Cox), or even non-parametric methods. Despite this, the normality assumption is often robust to minor violations in large samples.
+
+
+Limitations:
+
+1. Model fit: A lwo $R^2$ value (0.00053 indicates that the model explains very little of the variability in the response variable. This suggests potential omitted variables, inadequate predictors, or non-linear relationships that are not captured by the model)
+
+2. Normality of Residuals: The significant deviation of residuals from normality indicates the presence of outliers or skewed data. Although this does not invalidate the model, it may affect the reliability of statistical inference (e.g., *t*-tests and *p*-values)
+
+3. Homoscedasticity: While minor deviations exist, the presence of curved lines in the scale-location plot sugegsts a need for model re-specification or inclusion of predictors to better explain the varaince.
+
+4. Linearity and Interaction effects: The horizontal streaks in the residuals vs. fitted plot point to possible missing interaction terms or non-linear effects, which may reduce the model's predictive power.
+
+Conclusion:
+
+T^he linear regression model demonstrates a reasonable fit to the data given its simplicity. While the assumptions of linearity, independence, and homoscedasticity are almost satisfied, normality violations and a low $R^2$ value suggest room for significant improvement. There are some potential solutions to address these limitations:
+
+
+* Introduce transformations or interaction terms to improve linearity and account for potential non-linear effects.
+
+* Investigate additional predictors or omitted variables that might better explain the response variable's variance.
+
+* Address residual normality issues through robust methods or non-parametric approaches.
+
+Overall, despite this model serving as a starting point, further refinements and exploratory data analysis would improve the models explanaotry and predictive capabilities.
+
+
+
+
+```{r}
+# 1.e Predict the expected value of sqr_point_pct when win_pct = 0.8, DivWin = Yes, and CS = 8. Comment on the result.
+
+
+```
+
+
+```{r}
+# 1.f 
+```
+
+
+  
+
+
+
+
